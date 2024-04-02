@@ -1,14 +1,16 @@
-use crate::camelot::transition::{harmonic_transitions, make_transition, KeyTransition};
-use crate::camelot::{make_standard_scale, Key};
-use graphstuff::bron_kerbosch;
-use petgraph::prelude::{EdgeRef, NodeIndex};
-use petgraph::Graph;
-use std::cell::OnceCell;
 use std::cmp::Ordering;
-use std::collections::{BinaryHeap, HashMap};
+use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::iter;
-use std::ops::Deref;
 use std::sync::LazyLock;
+
+use petgraph::{Graph, Undirected};
+use petgraph::prelude::{EdgeRef, NodeIndex};
+
+use graphstuff::algo::clique::bron_kerbosch;
+use graphstuff::graph::SimpleGraph;
+
+use crate::camelot::{Key, make_standard_scale};
+use crate::camelot::transition::{harmonic_transitions, KeyTransition, make_transition};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 struct NodeDistance {
@@ -57,8 +59,10 @@ impl PartialOrd for Path {
     }
 }
 
+/// Creates a graph representing the possible harmonic scale transitions in the camelot wheel
 pub fn make_scale_transition_graph() -> ScaleTransitions {
-    let mut graph = petgraph::Graph::new();
+    
+    let mut graph = petgraph::Graph::<Key, KeyTransition, Undirected>::new_undirected();
 
     let nodes = make_standard_scale();
     let transitions = harmonic_transitions();
@@ -85,17 +89,18 @@ pub fn make_scale_transition_graph() -> ScaleTransitions {
 
 #[test]
 fn test_cliques() {
-    SCALE_TRANSITION_GRAPH.cliques();
+    dbg!(SCALE_TRANSITION_GRAPH.cliques());
 }
 
 pub struct ScaleTransitions {
     index: HashMap<Key, NodeIndex>,
-    graph: Graph<Key, KeyTransition>,
+    graph: Graph<Key, KeyTransition, Undirected>,
 }
 
 impl ScaleTransitions {
-    pub fn cliques(&self) {
-        dbg!(bron_kerbosch(&self.graph));
+    /// Returns the maximal cliques in the scale transition graph (only triangles)
+    pub fn cliques(&self) -> Vec<HashSet<u32>> {
+        bron_kerbosch(&SimpleGraph::from(self.graph.clone()))
     }
 
     pub fn path(source: Key, target: Key) -> Vec<Key> {
@@ -121,10 +126,9 @@ impl ScaleTransitions {
 pub static SCALE_TRANSITION_GRAPH: LazyLock<ScaleTransitions> =
     LazyLock::new(|| make_scale_transition_graph());
 
-pub fn shortest_path_between(source: Key, target: Key) {}
-
+/// Implementation of dijkstra's algorithm that returns the top n shortest paths
 fn multi_path_dijkstra(
-    graph: &Graph<Key, KeyTransition>,
+    graph: &Graph<Key, KeyTransition, Undirected>,
     source: NodeIndex<u32>,
     target: NodeIndex<u32>,
     n: usize,
@@ -170,6 +174,7 @@ fn multi_path_dijkstra(
     paths
 }
 
+/// Returns all possible harmonic transitions from a given key
 pub fn harmonic_transitions_from(scale: Key) -> Vec<Key> {
     let mut harmonic = harmonic_transitions()
         .map(|transition| make_transition(scale, transition))

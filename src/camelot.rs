@@ -1,12 +1,13 @@
-mod search;
-mod transition;
+use std::fmt::{Display, Formatter};
+use std::str::FromStr;
 
 use regex::Regex;
 use schemars::JsonSchema;
 use serde_with::{DeserializeFromStr, SerializeDisplay};
-use std::fmt::{Display, Formatter};
-use std::str::FromStr;
 use thiserror::Error;
+
+mod search;
+mod transition;
 
 #[derive(
     Copy,
